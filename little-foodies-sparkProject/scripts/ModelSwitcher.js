@@ -149,6 +149,7 @@ const iconFaceOhmygod = Textures.get('face-ohmygod');
 const iconFaceNice = Textures.get('face-nice');
 const iconFaceSmile = Textures.get('face-smile');
 const iconFaceOh = Textures.get('face-oh');
+const iconFaceAngry = Textures.get('face-angry');
 
 const faceIcons = [
   {image_texture: iconFaceNothing},
@@ -157,7 +158,8 @@ const faceIcons = [
   {image_texture: iconFaceOhmygod},
   {image_texture: iconFaceNice},
   {image_texture: iconFaceSmile},
-  {image_texture: iconFaceOh}
+  {image_texture: iconFaceOh},
+  {image_texture: iconFaceAngry}
 ];
 
 var faceConfig = {
@@ -173,6 +175,7 @@ const iconBubbleCloud = Textures.get('icon-bubble-cloud');
 const iconBubbleAngry = Textures.get('icon-bubble-angry');
 const iconBubbleAmazSharp = Textures.get('icon-bubble-amaz-sharp');
 const iconBubbleAmazCurve = Textures.get('icon-bubble-amaz-curve');
+const iconBubbleWeak = Textures.get('icon-bubble-weak');
 
 const bubbleIcons = [
   {image_texture: iconBubbleNormalRect},
@@ -180,7 +183,8 @@ const bubbleIcons = [
   {image_texture: iconBubbleCloud},
   {image_texture: iconBubbleAngry},
   {image_texture: iconBubbleAmazSharp},
-  {image_texture: iconBubbleAmazCurve}
+  {image_texture: iconBubbleAmazCurve},
+  {image_texture: iconBubbleWeak}
 ];
 
 var bubbleConfig = {
@@ -352,11 +356,17 @@ Patches.getPulseValue('longPressed').subscribe(function(){
 });
 
 Patches.getPulseValue('bgTapped').subscribe(function(){
-    canMoveObj = true;
-    canMoveBubble = false;
 
-    Patches.inputs.setBoolean('canMoveObject', canMoveObj);
-    Patches.inputs.setBoolean('canMoveBubble', canMoveBubble);
+    if(!canMoveObj) // if state switch
+    {
+        canMoveObj = true;
+        canMoveBubble = false;
+
+        Patches.inputs.setBoolean('canMoveObject', canMoveObj);
+        Patches.inputs.setBoolean('canMoveBubble', canMoveBubble);
+
+        PlayUISound(3);
+    }
 });
 
 // initial setting
@@ -372,11 +382,17 @@ Start();
 
 
 Patches.getPulseValue('bubbleTapped').subscribe(function(){
-    canMoveBubble = true;
-    canMoveObj = false;
 
-    Patches.inputs.setBoolean('canMoveObject', canMoveObj);
-    Patches.inputs.setBoolean('canMoveBubble', canMoveBubble);
+    if(!canMoveBubble)
+    {
+        canMoveBubble = true;
+        canMoveObj = false;
+
+        Patches.inputs.setBoolean('canMoveObject', canMoveObj);
+        Patches.inputs.setBoolean('canMoveBubble', canMoveBubble);
+
+        PlayUISound(3);
+    }
 });
 
 function PlayUISound (soundIndex)
