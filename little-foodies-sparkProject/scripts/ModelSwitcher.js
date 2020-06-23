@@ -18,11 +18,14 @@ const Scene = require('Scene');
 const Patches = require('Patches');
 const NativeUI = require('NativeUI');
 const Textures = require('Textures');
+const Reactive = require('Reactive');
 
 // Use export keyword to make a symbol available in scripting debug console
 export const Diagnostics = require('Diagnostics');
 
 
+var canMoveObj = true;
+var canMoveBubble = false;
 
 // To use variables and functions across files, use export/import keyword
 // export const animationDuration = 10;
@@ -49,6 +52,8 @@ charModels[4] = Scene.root.find('char-jock');
 charModels[5] = Scene.root.find('char-summer-girl');
 charModels[6] = Scene.root.find('char-game-girl');
 
+const blobShadowPlane = Scene.root.find('blob-shadow');
+
 Patches.getScalarValue('scriptModelIndex').monitor({fireOnInitialValue:true}).subscribe(function(value){
     SwitchModelByIndex(value.newValue);
 });
@@ -57,11 +62,18 @@ Patches.getScalarValue('scriptModelIndex').monitor({fireOnInitialValue:true}).su
 function SwitchModelByIndex (newIndex) {
     for(var i=0; i< charModels.length; i++)
     {
-        if(i == newIndex)
+        if(newIndex == charModels.length) // if it is the last hidden index
+            charModels[i].hidden = true;
+        else if(i == newIndex)
             charModels[i].hidden = false;
         else
             charModels[i].hidden = true;
     }
+
+    if(newIndex == charModels.length)
+        blobShadowPlane.hidden = true;
+    else
+        blobShadowPlane.hidden = false;
 }
 
 
@@ -82,6 +94,7 @@ const iconHeadJock = Textures.get('head-jock');
 const iconHeadGang = Textures.get('head-gang');
 const iconHeadGamegirl = Textures.get('head-game-girl');
 const iconHeadHipsterguy = Textures.get('head-hipster-guy');
+const iconHeadHidden = Textures.get('head-hidden');
 
 const charIcons = [
   {image_texture: iconHeadNY},
@@ -90,7 +103,8 @@ const charIcons = [
   {image_texture: iconHeadGang},
   {image_texture: iconHeadJock},
   {image_texture: iconHeadSummergirl},
-  {image_texture: iconHeadGamegirl}
+  {image_texture: iconHeadGamegirl},
+  {image_texture: iconHeadHidden}
 ];
 
 var charConfig = {
@@ -152,6 +166,50 @@ var faceConfig = {
 }
 
 
+var bubbleIndex = 0;
+const iconBubbleNormalRect = Textures.get('icon-bubble-normal-rect');
+const iconBubbleNormalRound = Textures.get('icon-bubble-normal-round');
+const iconBubbleCloud = Textures.get('icon-bubble-cloud');
+const iconBubbleAngry = Textures.get('icon-bubble-angry');
+const iconBubbleAmazSharp = Textures.get('icon-bubble-amaz-sharp');
+const iconBubbleAmazCurve = Textures.get('icon-bubble-amaz-curve');
+
+const bubbleIcons = [
+  {image_texture: iconBubbleNormalRect},
+  {image_texture: iconBubbleNormalRound},
+  {image_texture: iconBubbleCloud},
+  {image_texture: iconBubbleAngry},
+  {image_texture: iconBubbleAmazSharp},
+  {image_texture: iconBubbleAmazCurve}
+];
+
+var bubbleConfig = {
+    selectedIndex: bubbleIndex,
+    items: bubbleIcons
+}
+
+
+var starIndex = 0;
+
+const iconStar1 = Textures.get('icon-star-1');
+const iconStar2 = Textures.get('icon-star-2');
+const iconStar3 = Textures.get('icon-star-3');
+const iconStar4 = Textures.get('icon-star-4');
+const iconStar5 = Textures.get('icon-star-5');
+
+const starIcons = [
+    {image_texture: iconStar1},
+    {image_texture: iconStar2},
+    {image_texture: iconStar3},
+    {image_texture: iconStar4},
+    {image_texture: iconStar5}
+];
+
+var starConfig = {
+    selectedIndex: starIndex,
+    items: starIcons
+}
+
 
 var uiPicker = NativeUI.picker;
 
@@ -162,6 +220,15 @@ Patches.getScalarValue('editModeIndex').monitor({fireOnInitialValue:true}).subsc
 
 function SwitchEditMode ()
 {
+    if(isEditModeOn)
+    {
+        if(editModeIndex != 0)
+        {
+            isFirstSound = true;
+            canPickSound = true;
+        }
+    }
+
     if(editModeIndex == 0)
     {
         var editConfig = {
@@ -170,7 +237,9 @@ function SwitchEditMode ()
                 {image_texture: iconEditMode},
                 charIcons[charIndex],
                 animIcons[animIndex],
-                faceIcons[faceIndex]
+                faceIcons[faceIndex],
+                bubbleIcons[bubbleIndex],
+                starIcons[starIndex]
             ]
         }
         uiPicker.configure(editConfig);
@@ -190,12 +259,35 @@ function SwitchEditMode ()
         faceConfig.selectedIndex = faceIndex;
         uiPicker.configure(faceConfig);
     }
+    else if(editModeIndex == 4) // dialogue
+    {
+        bubbleConfig.selectedIndex = bubbleIndex;
+        uiPicker.configure(bubbleConfig);
+    }
+    else if(editModeIndex == 5) // star
+    {
+        starConfig.selectedIndex = starIndex;
+        uiPicker.configure(starConfig);
+    }
 }
 
-
+var canPickSound = false;
+var isFirstSound = false;
 
 uiPicker.selectedIndex.monitor().subscribe(function(index) {
-    if(editModeIndex == 0) // nothing
+
+    if(canPickSound && editModeIndex != 0)
+    {
+        if(isFirstSound)
+        {
+            PlayUISound(1);
+            isFirstSound = false;
+        }
+        else
+            PlayUISound(2);
+    }
+
+    if(editModeIndex == 0) // choose setting thing
     {
         editModeIndex = index.newValue;
         SwitchEditMode();
@@ -215,26 +307,80 @@ uiPicker.selectedIndex.monitor().subscribe(function(index) {
         faceIndex = index.newValue;
         Patches.setScalarValue('pickerFaceIndex', faceIndex);
     }
-    Diagnostics.log(index);
+    else if(editModeIndex == 4)
+    {
+        bubbleIndex = index.newValue;
+        Patches.setScalarValue('pickerDialogueIndex', bubbleIndex);
+    }
+    else if(editModeIndex == 5)
+    {
+        starIndex = index.newValue;
+        Patches.setScalarValue('pickerRating', starIndex);
+    }
 });
-
 
 
 
 
 const iconEditMode = Textures.get('edit-icon');
 
-Patches.getPulseValue('bgTapped').subscribe(function(){
-    isEditModeOn = !isEditModeOn;
-
+Patches.getPulseValue('longPressed').subscribe(function(){
     if(isEditModeOn)
     {
+        if(editModeIndex > 0)
+        {
+            editModeIndex = 0;
+            SwitchEditMode();
+            PlayUISound(0);
+        }
+        else // turn off
+        {
+            isEditModeOn = false;
+            uiPicker.visible = false;
+            PlayUISound(0);
+        }
+    }
+    else // turn on
+    {
+        isEditModeOn = true;
+
         editModeIndex = 0;
         SwitchEditMode();
         uiPicker.visible = true;
-    }
-    else
-    {
-        uiPicker.visible = false;
+        PlayUISound(1);
     }
 });
+
+Patches.getPulseValue('bgTapped').subscribe(function(){
+    canMoveObj = true;
+    canMoveBubble = false;
+
+    Patches.inputs.setBoolean('canMoveObject', canMoveObj);
+    Patches.inputs.setBoolean('canMoveBubble', canMoveBubble);
+});
+
+// initial setting
+function Start () {
+    editModeIndex = 0;
+    SwitchEditMode();
+    uiPicker.visible = false;
+
+    Patches.inputs.setBoolean('canMoveObject', canMoveObj);
+    Patches.inputs.setBoolean('canMoveBubble', canMoveBubble);
+}
+Start();
+
+
+Patches.getPulseValue('bubbleTapped').subscribe(function(){
+    canMoveBubble = true;
+    canMoveObj = false;
+
+    Patches.inputs.setBoolean('canMoveObject', canMoveObj);
+    Patches.inputs.setBoolean('canMoveBubble', canMoveBubble);
+});
+
+function PlayUISound (soundIndex)
+{
+    Patches.inputs.setScalar('uiSoundIndex', soundIndex);
+    Patches.inputs.setPulse('playUiSound', Reactive.once());
+}
