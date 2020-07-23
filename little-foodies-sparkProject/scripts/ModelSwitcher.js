@@ -19,6 +19,7 @@ const Patches = require('Patches');
 const NativeUI = require('NativeUI');
 const Textures = require('Textures');
 const Reactive = require('Reactive');
+const Time = require('Time');
 
 // Use export keyword to make a symbol available in scripting debug console
 export const Diagnostics = require('Diagnostics');
@@ -84,6 +85,11 @@ var isEditModeOn = false;
 var editModeIndex = 0;
 
 
+const emptyIcons = [];
+var emptyConfig = {
+    selectedIndex: 0,
+    items: emptyIcons
+}
 
 var charIndex = 0;
 
@@ -217,7 +223,7 @@ var starConfig = {
 
 var uiPicker = NativeUI.picker;
 
-Patches.getScalarValue('editModeIndex').monitor({fireOnInitialValue:true}).subscribe(function(value){
+Patches.getScalarValue('editModeIndex').monitor({fireOnInitialValue:false}).subscribe(function(value){
     editModeIndex = value.newValue;
     SwitchEditMode();
 });
@@ -235,18 +241,7 @@ function SwitchEditMode ()
 
     if(editModeIndex == 0)
     {
-        var editConfig = {
-            selectedIndex: 0,
-            items: [
-                {image_texture: iconEditMode},
-                charIcons[charIndex],
-                animIcons[animIndex],
-                faceIcons[faceIndex],
-                bubbleIcons[bubbleIndex],
-                starIcons[starIndex]
-            ]
-        }
-        uiPicker.configure(editConfig);
+        uiPicker.configure(getEditConfig());
     }
     if(editModeIndex == 1) // character
     {
@@ -278,8 +273,34 @@ function SwitchEditMode ()
 var canPickSound = false;
 var isFirstSound = false;
 
-uiPicker.selectedIndex.monitor().subscribe(function(index) {
+var indexSelected = false;
+var indexWaitTime = 200;
+var tempSelectedIndex = 0;
 
+uiPicker.selectedIndex.monitor().subscribe(function(index) {
+    indexSelected = true;
+    indexWaitTime = 300;
+    tempSelectedIndex = index;
+});
+
+const selectIndexUpdateTimer = Time.setInterval(Update, 50);
+
+function Update () {
+    if(indexSelected)
+    {
+        if(indexWaitTime <= 0)
+        {
+            selectedIndexExecute(tempSelectedIndex);
+            indexSelected = false;
+        }
+        else
+        {
+            indexWaitTime -= 50;
+        }
+    }
+}
+
+function selectedIndexExecute (index) {
     if(canPickSound && editModeIndex != 0)
     {
         if(isFirstSound)
@@ -321,7 +342,7 @@ uiPicker.selectedIndex.monitor().subscribe(function(index) {
         starIndex = index.newValue;
         Patches.setScalarValue('pickerRating', starIndex);
     }
-});
+}
 
 
 
@@ -341,6 +362,8 @@ Patches.getPulseValue('longPressed').subscribe(function(){
         {
             isEditModeOn = false;
             uiPicker.visible = false;
+            uiPicker.configure(emptyConfig);
+
             PlayUISound(0);
         }
     }
@@ -351,6 +374,7 @@ Patches.getPulseValue('longPressed').subscribe(function(){
         editModeIndex = 0;
         SwitchEditMode();
         uiPicker.visible = true;
+        uiPicker.configure(getEditConfig());
         PlayUISound(1);
     }
 });
@@ -369,11 +393,28 @@ Patches.getPulseValue('bgTapped').subscribe(function(){
     }
 });
 
+function getEditConfig () {
+    var editConfig = {
+        selectedIndex: 0,
+        items: [
+            {image_texture: iconEditMode},
+            charIcons[charIndex],
+            animIcons[animIndex],
+            faceIcons[faceIndex],
+            bubbleIcons[bubbleIndex],
+            starIcons[starIndex]
+        ]
+    }
+
+    return editConfig;
+}
+
 // initial setting
 function Start () {
     editModeIndex = 0;
-    SwitchEditMode();
+
     uiPicker.visible = false;
+    uiPicker.configure(emptyConfig);
 
     Patches.inputs.setBoolean('canMoveObject', canMoveObj);
     Patches.inputs.setBoolean('canMoveBubble', canMoveBubble);
