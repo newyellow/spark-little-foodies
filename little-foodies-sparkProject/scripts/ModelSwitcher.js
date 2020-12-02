@@ -20,6 +20,10 @@ const NativeUI = require('NativeUI');
 const Textures = require('Textures');
 const Reactive = require('Reactive');
 const Time = require('Time');
+const Persistence = require('Persistence');
+
+const userScope = Persistence.userScope;
+var storageData = {};
 
 // Use export keyword to make a symbol available in scripting debug console
 export const Diagnostics = require('Diagnostics');
@@ -81,7 +85,7 @@ function SwitchModelByIndex (newIndex) {
 
 // picker things
 
-var isEditModeOn = false;
+var isEditModeOn = true; // never end edit now
 var editModeIndex = 0;
 
 
@@ -321,30 +325,33 @@ function selectedIndexExecute (index) {
     {
         charIndex = index.newValue;
         Patches.setScalarValue('pickerCharIndex', charIndex);
+        SavePersistConfig();
     }
     else if(editModeIndex == 2)
     {
         animIndex = index.newValue;
         Patches.setScalarValue('pickerAnimIndex', animIndex);
+        SavePersistConfig();
     }
     else if(editModeIndex == 3)
     {
         faceIndex = index.newValue;
         Patches.setScalarValue('pickerFaceIndex', faceIndex);
+        SavePersistConfig();
     }
     else if(editModeIndex == 4)
     {
         bubbleIndex = index.newValue;
         Patches.setScalarValue('pickerDialogueIndex', bubbleIndex);
+        SavePersistConfig();
     }
     else if(editModeIndex == 5)
     {
         starIndex = index.newValue;
         Patches.setScalarValue('pickerRating', starIndex);
+        SavePersistConfig();
     }
 }
-
-
 
 
 const iconEditMode = Textures.get('edit-icon');
@@ -360,9 +367,11 @@ Patches.getPulseValue('longPressed').subscribe(function(){
         }
         else // turn off
         {
-            isEditModeOn = false;
-            uiPicker.visible = false;
-            uiPicker.configure(emptyConfig);
+            // no turning off now
+
+            //isEditModeOn = false;
+            //uiPicker.visible = false;
+            //uiPicker.configure(emptyConfig);
 
             PlayUISound(0);
         }
@@ -380,7 +389,9 @@ Patches.getPulseValue('longPressed').subscribe(function(){
 });
 
 Patches.getPulseValue('bgTapped').subscribe(function(){
-
+    userScope.remove('foodieSetting').then(function(result){
+        Diagnostics.log("test data removed:" + result);
+    });
     if(!canMoveObj) // if state switch
     {
         canMoveObj = true;
@@ -393,7 +404,73 @@ Patches.getPulseValue('bgTapped').subscribe(function(){
     }
 });
 
+async function LoadPersistConfig () {
+    await userScope.get('foodieSetting').then(function(result){
+        Diagnostics.log("foodie loaded");
+        if(result == null)
+        {
+            //Patches.inputs.setString('debugMsg', 'result null');
+            Diagnostics.log("no data");
+            storageData.charIndex = 0;
+            storageData.animIndex = 0;
+            storageData.faceIndex = 0;
+            storageData.bubbleIndex = 0;
+            storageData.starIndex = 0;
+        }
+        else
+        {
+            storageData = result;
+            Diagnostics.log("yes data");
+
+            if(storageData.charIndex != null)
+                charIndex = storageData.charIndex;
+
+            if(storageData.animIndex != null)
+                animIndex = storageData.animIndex;
+
+            if(storageData.faceIndex != null)
+                faceIndex = storageData.faceIndex;
+
+            if(storageData.bubbleIndex != null)
+                bubbleIndex = storageData.bubbleIndex;
+
+            if(storageData.starIndex != null)
+                starIndex = storageData.starIndex;
+        }
+    }).catch(function(error){
+        //Patches.inputs.setString('debugMsg', error);
+        storageData.charIndex = 0;
+        storageData.animIndex = 0;
+        storageData.faceIndex = 0;
+        storageData.bubbleIndex = 0;
+        storageData.starIndex = 0;
+    });
+
+    // apply all
+    Patches.setScalarValue('pickerCharIndex', charIndex);
+    Patches.setScalarValue('pickerAnimIndex', animIndex);
+    Patches.setScalarValue('pickerFaceIndex', faceIndex);
+    Patches.setScalarValue('pickerDialogueIndex', bubbleIndex);
+    Patches.setScalarValue('pickerRating', starIndex);
+}
+
+async function SavePersistConfig () {
+    storageData.charIndex = charIndex;
+    storageData.animIndex = animIndex;
+    storageData.faceIndex = faceIndex;
+    storageData.bubbleIndex = bubbleIndex;
+    storageData.starIndex = starIndex;
+
+    await userScope.set('foodieSetting', storageData).then(success => {
+        Diagnostics.log("foodieSetting Set: " + success);
+        Diagnostics.log(storageData);
+    });
+
+}
+
 function getEditConfig () {
+    Diagnostics.log("QQ!!");
+    Diagnostics.log(charIndex + "," + animIndex + "," + faceIndex + "," + bubbleIndex + "," + starIndex);
     var editConfig = {
         selectedIndex: 0,
         items: [
@@ -410,17 +487,18 @@ function getEditConfig () {
 }
 
 // initial setting
-function Start () {
+async function Start () {
+
     editModeIndex = 0;
 
-    uiPicker.visible = false;
-    uiPicker.configure(emptyConfig);
+    await LoadPersistConfig();
 
+    uiPicker.visible = true;
+    uiPicker.configure(getEditConfig());
     Patches.inputs.setBoolean('canMoveObject', canMoveObj);
     Patches.inputs.setBoolean('canMoveBubble', canMoveBubble);
 }
 Start();
-
 
 Patches.getPulseValue('bubbleTapped').subscribe(function(){
 
